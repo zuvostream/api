@@ -36,14 +36,14 @@ app.group('/v1', (app) =>
           password: t.String({ minLength: 8, maxLength: 32 })
       })
   })
-.post('/sigin', async ({body, jwt, cookie: { token }}) => {
+.post('/signin', async ({body, jwt, cookie: { token }}) => {
   let { username, password } = body as { username: string; password: string };
   try {
     let user = await db.user.findFirst({ 
         where: { username }
     });
     if (!user || !(await bcryptjs.compare(password, user.password))) {
-        return { success: false, message: "Invalid identifier or password" };
+        return { success: false, message: "Invalid username or password" };
     } 
     let jasontoken = await jwt.sign({ id: user.id  });
     token.set({
@@ -62,6 +62,28 @@ body: t.Object({
 })   
 })
 )
+.put('/me', async ({jwt, cookie: {token}}) => {
+    let me = await jwt.verify(token.value)
+    if(!me){
+        return { success: false, message: "Invalid token" };
+    } 
+    let userId = String(me.id);
+    let user = await db.user.findUnique({
+        where: {
+            id: userId,
+        },
+    });
+    return{
+        "success": true,
+        "token": token.value,
+        "user": {
+            "id": me.id,
+            "Username": user?.username,
+            "Banner": user?.Banner,
+            "Avatar": user?.Avatar
+        }
+    }
+} )
 .listen(process.env.PORT!);
 
 console.log(
