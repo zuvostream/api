@@ -1,0 +1,20 @@
+{
+  "name": "catpics-api",
+  "version": "1.0.50",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "bun run --watch src/index.ts"
+  },
+  "dependencies": {
+    "@elysiajs/jwt": "^1.1.0",
+    "@prisma/client": "^5.18.0",
+    "bcryptjs": "^2.4.3",
+    "elysia": "latest",
+    "prisma": "^5.18.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bun-types": "latest"
+  },
+  "module": "src/index.js"
+}
