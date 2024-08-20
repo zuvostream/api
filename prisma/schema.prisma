@@ -16,7 +16,7 @@ datasource db {
 model User {
   id        String @id @default(uuid())
   username     String 
-  email     String 
+  email     String @unique 
   password  String
   Avatar  String @default("https://r2.catpics.xyz/default.png")
   Banner String @default("https://tenor.com/view/nettspend-nett-spend-plugg-laser-gif-384136205674952587")  //This will be customizeable later

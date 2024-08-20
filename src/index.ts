@@ -59,8 +59,7 @@ app.group('/v1', (app) =>
 body: t.Object({
     username: t.String({ maxLength: 32 }),
     password: t.String({ minLength: 8 })
-})   
-})
+})})
 )
 .put('/me', async ({jwt, cookie: {token}}) => {
     let me = await jwt.verify(token.value)
