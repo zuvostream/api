@@ -1,7 +1,8 @@
-import { Elysia, t } from "elysia";
+import { Elysia, redirect, t } from "elysia";
 import { PrismaClient } from "@prisma/client"
 import { jwt } from '@elysiajs/jwt'
 import bcryptjs from "bcryptjs";
+import cors from "@elysiajs/cors";
 let db = new PrismaClient();
 let app = new Elysia()
 .use(
@@ -10,6 +11,7 @@ let app = new Elysia()
     secret: process.env.JWT!
 })
 )
+.use(cors())
 app.group('/v1', (app) => 
   app
   .post('/register', async ({body}) => {
@@ -60,6 +62,35 @@ body: t.Object({
     username: t.String({ maxLength: 32 }),
     password: t.String({ minLength: 8 })
 })})
+.post('/signout', async ({ jwt, cookie: { token }}) => {
+    let me = await jwt.verify(token.value)
+    if(!me){
+        return { success: false, message: "Invalid token" };
+    } 
+    token.remove();
+})
+.post('/user/:username', async ({ set, params: { username }}) => {
+    //chcek prisma for username
+    let user = await db.user.findFirst({ where: { username } })
+    let schema = [
+         user?.username,
+        user?.About || 'No Bio Provided',
+        user?.Avatar,
+        user?.Banner
+    ]
+    if(!user) {
+        set.status = 404
+        return { success: false }
+    }
+    return { 
+        success: true, 
+        user: {
+            "Username": user?.username,
+            "Banner": user?.Banner,
+            "Avatar": user?.Avatar,
+            "Bio": user?.About || 'No Bio Provided'
+        } };
+})
 )
 .put('/me', async ({jwt, cookie: {token}}) => {
     let me = await jwt.verify(token.value)
