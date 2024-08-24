@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client"
 import { jwt } from '@elysiajs/jwt'
 import bcryptjs from "bcryptjs";
 import cors from "@elysiajs/cors";
+import { discord_url } from "./exports";
 let db = new PrismaClient();
 let app = new Elysia()
 .use(
@@ -88,7 +89,8 @@ body: t.Object({
             "Username": user?.username,
             "Banner": user?.Banner,
             "Avatar": user?.Avatar,
-            "Bio": user?.About || 'No Bio Provided'
+            "Bio": user?.About || 'No Bio Provided',
+            "Discord": user?.Discord
         } };
 })
 )
@@ -113,7 +115,65 @@ body: t.Object({
             "Avatar": user?.Avatar
         }
     }
-} )
+} 
+)
+.group('/connections', (app) =>
+    app
+    .get('/discord', async => {
+        return redirect(discord_url)
+    })
+)
+
+.group('/callback', (app) =>
+    app.get('/discord', async ({ query, jwt, cookie: { token } }) => {
+        let { code } = query as { code: string };
+
+        if (!code) {
+            return { success: false, message: "No code provided" };
+        }
+        try {
+            let accessTokenResponse = await fetch("https://discord.com/api/oauth2/token", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                    client_id: process.env.DISCORD_CLIENT_ID!,
+                    client_secret: process.env.DISCORD_CLIENT_SECRET!,
+                    code,
+                    grant_type: "authorization_code",
+                    redirect_uri: process.env.DISCORD_REDIRECT_URI!,
+                    scope: "identify",
+                }),
+            });
+            let accessTokenData = await accessTokenResponse.json();
+            if (!accessTokenData.access_token) {
+                return { success: false, message: "Failed to get access token" };
+            }
+            let userResponse = await fetch("https://discord.com/api/users/@me", {
+                headers: {
+                    "Authorization": `Bearer ${accessTokenData.access_token}`,
+                },
+            });
+            let discordUser = await userResponse.json();
+            let me = await jwt.verify(token.value);
+            if (!me) {
+                return { success: false, message: "Invalid token" };
+            }
+
+            await db.user.update({
+                where: { id: String(me.id) },
+                data: { Discord: discordUser.username },
+            });
+
+            return { success: true, message: "Discord account linked", discordUsername: discordUser.username };
+        } catch (error) {
+            return { success: false, message: "An error occurred" };
+        }
+    })
+)
+
+
 .listen(process.env.PORT!);
 
 console.log(
