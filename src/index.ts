@@ -78,8 +78,36 @@ body: t.Object({
     if(!project) {
     return { success: false, message: "ay dis don't exsist 😭🙏"}
     }
-    return { success: true, data: project}
+let users = await db.user.findUnique({ where: { id: project.creatorId } });
+    if(!users) {
+        return { success: false, message: "ay dis don't exsist �����"}
+    }
+    return { success: true,
+        project: {
+            id: project.id,
+            title: project.title,
+            Visibility : project.Visibility,
+            image: project.image,
+            Creator: users.username,
+            createdAt: project.createdAt,
+            updatedAt: project.updatedAt
+        }
+    }
 })
+.post('/create', async ({ body, set, jwt, cookie: { token }}) => {
+    let me = await jwt.verify( token.value )
+    if(!me) {
+        set.status = 401
+        return { success: false, message: "Invalid token" };
+    }
+    let { title } = body as { title: string}
+},
+{
+        body: t.Object({
+            title: t.String({ maxLength: 64 })
+        })
+}
+)
 )
 .put('/me', async ({ jwt, cookie: { token } }) => {
     let me = await jwt.verify(token.value);
