@@ -3,7 +3,6 @@ import { PrismaClient } from "@prisma/client"
 import { jwt } from '@elysiajs/jwt'
 import bcryptjs from "bcryptjs";
 import cors from "@elysiajs/cors";
-import { discord_url, page_url, spotify_url } from "./exports";
 let db = new PrismaClient();
 let app = new Elysia()
 .use(
@@ -70,147 +69,49 @@ body: t.Object({
     } 
     token.remove();
 })
-.post('/user/:username', async ({ set, params: { username }}) => {
-    //chcek prisma for username
-    let user = await db.user.findFirst({ where: { username } })
-    let schema = [
-         user?.username,
-        user?.About || 'No Bio Provided',
-        user?.Avatar,
-        user?.Banner
-    ]
-    if(!user) {
-        set.status = 404
-        return { success: false }
+.get('/project/:id', async ({jwt, cookie: { token }, params: {id}}) => {
+    let me = await jwt.verify(token.value);
+    if (!me) {
+        return { success: false, message: "Invalid token" };
     }
-    return { 
-        success: true, 
-        user: {
-            "Username": user?.username,
-            "Banner": user?.Banner,
-            "Avatar": user?.Avatar,
-            "Bio": user?.About || 'No Bio Provided',
-            "Discord": user?.Discord
-        } };
+    let project = await db.project.findUnique({ where: { id: id}})
+    if(!project) {
+    return { success: false, message: "ay dis don't exsist 😭🙏"}
+    }
+    return { success: true, data: project}
 })
 )
-.put('/me', async ({jwt, cookie: {token}}) => {
-    let me = await jwt.verify(token.value)
-    if(!me){
+.put('/me', async ({ jwt, cookie: { token } }) => {
+    let me = await jwt.verify(token.value);
+    if (!me) {
         return { success: false, message: "Invalid token" };
-    } 
+    }
+
     let userId = String(me.id);
     let user = await db.user.findUnique({
-        where: {
-            id: userId,
+        where: { id: userId },
+        include: {
+            projects: true,
         },
     });
-    return{
-        "success": true,
-        "token": token.value,
-        "user": {
-            "id": me.id,
-            "Username": user?.username,
-            "Banner": user?.Banner,
-            "Avatar": user?.Avatar
+
+    return {
+        success: true,
+        token: token.value,
+        user: {
+            id: me.id,
+            username: user?.username,
+            projects: user?.projects.map(project => ({
+                id: project.id,
+                title: project.title,
+                Visibility : project.Visibility,
+                image: project.image,
+                createdAt: project.createdAt,
+                updatedAt: project.updatedAt
+            })) || [],
         }
-    }
-} 
-)
-.group('/connections', (app) =>
-    app
-    .get('/discord', async => {
-        return redirect(discord_url)
-    })
-    .get('/spotify', async => {
-        return redirect(spotify_url)
-    })
-)
-
-.group('/callback', (app) =>
-    app
-    .get('/discord', async ({ query, jwt, cookie: { token } }) => {
-        let { code } = query as { code: string };
-
-        if (!code) {
-            return { success: false, message: "No code provided" };
-        }
-            let accessTokenResponse = await fetch("https://discord.com/api/oauth2/token", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                    client_id: process.env.DISCORD_CLIENT_ID!,
-                    client_secret: process.env.DISCORD_CLIENT_SECRET!,
-                    code,
-                    grant_type: "authorization_code",
-                    redirect_uri: process.env.DISCORD_REDIRECT_URI!,
-                    scope: "identify",
-                }),
-            });
-            let accessTokenData = await accessTokenResponse.json();
-            if (!accessTokenData.access_token) {
-                return { success: false, message: "Failed to get access token" };
-            }
-            let userResponse = await fetch("https://discord.com/api/users/@me", {
-                headers: {
-                    "Authorization": `Bearer ${accessTokenData.access_token}`,
-                },
-            });
-            let discordUser = await userResponse.json();
-            let me = await jwt.verify(token.value);
-            if (!me) {
-                return { success: false, message: "Invalid token" };
-            }
-
-            await db.user.update({
-                where: { id: String(me.id) },
-                data: { Discord: discordUser.username },
-            });
-
-            return redirect(page_url)
-    })
-    .get('/spotify', async ({ query, jwt, cookie: { token } }) => {
-        const { code } = query as { code: string };
-        if (!code) {
-            return { success: false, message: "No code provided" };
-        }
-            const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
-                },
-                body: new URLSearchParams({
-                    grant_type: "authorization_code",
-                    code,
-                    redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
-                })
-            });
-            const tokenData = await tokenResponse.json();
-            if (!tokenData.access_token) {
-                return { success: false, message: "Failed to get access token" };
-            }
-            let me = await jwt.verify(token.value);
-            if (!me) {
-                return { success: false, message: "Invalid token" };
-            }
-            const expiresIn = parseInt(tokenData.expires_in, 10);
-            await db.user.update({
-                where: { id: String(me.id) },
-                data: { 
-                    SpotifyToken: tokenData.access_token,
-                    SpotifyRefreshToken: tokenData.refresh_token,
-                    SpotifyExpiresIn: expiresIn,
-                 },
-            });
-            //I might be dumbb  
-            return redirect(page_url);
-    }) 
-)
-
-
+    };
+})
 .listen(process.env.PORT!);
 console.log(
   `🦊 Elysia is running at http://${app.server?.hostname}:${app.server?.port}`

@@ -12,18 +12,34 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 model User {
-  id        String @id @default(uuid())
-  username     String 
-  email     String @unique 
+  id        String    @id @default(uuid())
+  username  String
+  email     String    @unique
   password  String
-  Avatar  String @default("https://r2.catpics.xyz/default.png")
-  Banner String @default("https://tenor.com/view/nettspend-nett-spend-plugg-laser-gif-384136205674952587")  //This will be customizeable later
-  About String?
-  //Connections
-  Discord String? //I could probably name this something else but I cannot be bothered to rn Aug 23 5:57 PM
-  SpotifyToken String?
-  SpotifyExpiresIn Int?
-  SpotifyRefreshToken String?
+  projects  Project[]
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  title       String
+  image       String
+  Visibility  ProjectVisibility @default(PUBLIC)
+  creatorId   String
+  creator     User      @relation(fields: [creatorId], references: [id])
+  tracks      Track[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Track {
+  id          String    @id @default(uuid())
+  title       String
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id])
+}
+
+enum ProjectVisibility { 
+  PRIVATE
+  PUBLIC
 }
