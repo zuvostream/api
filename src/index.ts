@@ -70,10 +70,6 @@ body: t.Object({
     token.remove();
 })
 .get('/project/:id', async ({jwt, cookie: { token }, params: {id}}) => {
-    let me = await jwt.verify(token.value);
-    if (!me) {
-        return { success: false, message: "Invalid token" };
-    }
     let project = await db.project.findUnique({ where: { id: id}})
     if(!project) {
     return { success: false, message: "ay dis don't exsist 😭🙏"}
@@ -101,6 +97,12 @@ let users = await db.user.findUnique({ where: { id: project.creatorId } });
         return { success: false, message: "Invalid token" };
     }
     let { title } = body as { title: string}
+let createproject = await db.project.create({
+    data: {
+        title: body.title,
+        creatorId: String(me.id) 
+    }
+});
 },
 {
         body: t.Object({

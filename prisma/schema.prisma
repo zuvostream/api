@@ -23,8 +23,8 @@ model User {
 model Project {
   id          String    @id @default(cuid())
   title       String
-  image       String
-  Visibility  ProjectVisibility @default(PUBLIC)
+  image       String @default("https://r2.catpics.xyz/Frame%201.png")
+  Visibility  ProjectVisibility @default(Public)
   creatorId   String
   creator     User      @relation(fields: [creatorId], references: [id])
   tracks      Track[]
@@ -40,6 +40,6 @@ model Track {
 }
 
 enum ProjectVisibility { 
-  PRIVATE
-  PUBLIC
+  Private
+  Public
 }
