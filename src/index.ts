@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client"
 import { jwt } from '@elysiajs/jwt'
 import bcryptjs from "bcryptjs";
 import cors from "@elysiajs/cors";
-import { discord_url } from "./exports";
+import { discord_url, page_url, spotify_url } from "./exports";
 let db = new PrismaClient();
 let app = new Elysia()
 .use(
@@ -122,16 +122,19 @@ body: t.Object({
     .get('/discord', async => {
         return redirect(discord_url)
     })
+    .get('/spotify', async => {
+        return redirect(spotify_url)
+    })
 )
 
 .group('/callback', (app) =>
-    app.get('/discord', async ({ query, jwt, cookie: { token } }) => {
+    app
+    .get('/discord', async ({ query, jwt, cookie: { token } }) => {
         let { code } = query as { code: string };
 
         if (!code) {
             return { success: false, message: "No code provided" };
         }
-        try {
             let accessTokenResponse = await fetch("https://discord.com/api/oauth2/token", {
                 method: "POST",
                 headers: {
@@ -166,16 +169,49 @@ body: t.Object({
                 data: { Discord: discordUser.username },
             });
 
-            return { success: true, message: "Discord account linked", discordUsername: discordUser.username };
-        } catch (error) {
-            return { success: false, message: "An error occurred" };
-        }
+            return redirect(page_url)
     })
+    .get('/spotify', async ({ query, jwt, cookie: { token } }) => {
+        const { code } = query as { code: string };
+        if (!code) {
+            return { success: false, message: "No code provided" };
+        }
+            const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+                },
+                body: new URLSearchParams({
+                    grant_type: "authorization_code",
+                    code,
+                    redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
+                })
+            });
+            const tokenData = await tokenResponse.json();
+            if (!tokenData.access_token) {
+                return { success: false, message: "Failed to get access token" };
+            }
+            let me = await jwt.verify(token.value);
+            if (!me) {
+                return { success: false, message: "Invalid token" };
+            }
+            const expiresIn = parseInt(tokenData.expires_in, 10);
+            await db.user.update({
+                where: { id: String(me.id) },
+                data: { 
+                    SpotifyToken: tokenData.access_token,
+                    SpotifyRefreshToken: tokenData.refresh_token,
+                    SpotifyExpiresIn: expiresIn,
+                 },
+            });
+            //I might be dumbb  
+            return redirect(page_url);
+    }) 
 )
 
 
 .listen(process.env.PORT!);
-
 console.log(
   `🦊 Elysia is running at http://${app.server?.hostname}:${app.server?.port}`
 );
