@@ -131,6 +131,7 @@ let createproject = await db.project.create({
         user: {
             id: me.id,
             username: user?.username,
+	    Avatar: user?.Avatar,
             projects: user?.projects.map(project => ({
                 id: project.id,
                 title: project.title,
