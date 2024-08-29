@@ -80,36 +80,64 @@ let users = await db.user.findUnique({ where: { id: project.creatorId } });
     }
     return { success: true,
         project: {
-            id: project.id,
-            title: project.title,
+            Id: project.id,
+            Title: project.title,
             Visibility : project.Visibility,
-            image: project.image,
+            Image: project.image,
             Creator: users.username,
-            createdAt: project.createdAt,
-            updatedAt: project.updatedAt
+            CreatedAt: project.createdAt,
+            UpdatedAt: project.updatedAt
         }
     }
 })
-.post('/create', async ({ body, set, jwt, cookie: { token }}) => {
+.post('/create/project', async ({ set, jwt, cookie: { token }}) => {
     let me = await jwt.verify( token.value )
     if(!me) {
         set.status = 401
         return { success: false, message: "Invalid token" };
     }
-    let { title } = body as { title: string}
+    let user = await db.user.findUnique({ where: { id: String(me.id) },
+    })
 let createproject = await db.project.create({
     data: {
-        title: body.title,
+        title: user?.username + `'s Project`,
         creatorId: String(me.id) 
     }
 });
 },
-{
-        body: t.Object({
-            title: t.String({ maxLength: 64 })
-        })
-}
 )
+.post('/redeem', async ({ body, set, jwt, cookie: { token }}) => {
+    let me = await jwt.verify(token.value);
+    if (!me) {
+        set.status = 401;
+        return { success: false, message: "Invalid token" };
+    }
+    let { Code } = body as { Code: string };
+    try {
+        let searchdb = await db.premiumKeys.findFirst({
+            where: { Code }
+        });
+
+        if (!searchdb) {
+            set.status = 404;
+            return { success: false, message: "Invalid key or already used." };
+        }
+        await db.premiumKeys.delete({
+            where: {
+                id: searchdb.id
+            }
+        });
+
+        return { success: true, message: "Key redeemed successfully." };
+    } catch (error) {
+        set.status = 500;
+        return { success: false, message: "An error occurred during the operation." };
+    }
+}, {
+    body: t.Object({
+        Code: t.String({})
+    })
+})
 )
 .put('/me', async ({ jwt, cookie: { token } }) => {
     let me = await jwt.verify(token.value);
@@ -121,10 +149,13 @@ let createproject = await db.project.create({
     let user = await db.user.findUnique({
         where: { id: userId },
         include: {
-            projects: true,
+            projects: {
+                include: {
+                    creator: true
+                }
+            }
         },
     });
-
     return {
         success: true,
         token: token.value,
@@ -132,13 +163,14 @@ let createproject = await db.project.create({
             id: me.id,
             username: user?.username,
 	    Avatar: user?.Avatar,
-            projects: user?.projects.map(project => ({
-                id: project.id,
-                title: project.title,
+                projects: user?.projects.map(project => ({
+                Id: project.id,
+                Title: project.title,
                 Visibility : project.Visibility,
-                image: project.image,
-                createdAt: project.createdAt,
-                updatedAt: project.updatedAt
+                Image: project.image,
+                Creator: project.creator?.username,
+                CreatedAt: project.createdAt,
+                UpdatedAt: project.updatedAt
             })) || [],
         }
     };

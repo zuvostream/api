@@ -39,6 +39,10 @@ model Track {
   projectId   String
   project     Project   @relation(fields: [projectId], references: [id])
 }
+model PremiumKeys {
+  id          String    @id @default(uuid())
+  Code        String
+}
 
 enum ProjectVisibility { 
   Private
